@@ -8,6 +8,8 @@ import android.support.design.widget.TabLayout;
 import android.support.v4.app.Fragment;
 import android.support.v4.view.ViewPager;
 import android.os.Bundle;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.Display;
@@ -24,15 +26,26 @@ import android.widget.PopupWindow;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import com.chanven.lib.cptr.PtrClassicFrameLayout;
+import com.chanven.lib.cptr.PtrFrameLayout;
+import com.chanven.lib.cptr.PtrHandler;
+import com.chanven.lib.cptr.recyclerview.RecyclerAdapterWithHF;
 import com.google.gson.Gson;
+import com.zmx.mobilecashier.adapter.AreCancelledAdapter;
 import com.zmx.mobilecashier.adapter.CPFragmentAdapter;
 import com.zmx.mobilecashier.adapter.GoodsShoppingAdapter;
 import com.zmx.mobilecashier.adapter.MemberCouponsAdapter;
+import com.zmx.mobilecashier.bean.AreCancelled;
+import com.zmx.mobilecashier.bean.AreCancelledDetails;
 import com.zmx.mobilecashier.bean.CouponsMessage;
 import com.zmx.mobilecashier.bean.Goods;
 import com.zmx.mobilecashier.bean.Group;
 import com.zmx.mobilecashier.bean.MembersMessage;
 import com.zmx.mobilecashier.bean.ViceOrder;
+import com.zmx.mobilecashier.dao.areCancelledDao;
+import com.zmx.mobilecashier.dao.areCancelledDetailsDao;
+import com.zmx.mobilecashier.dao.goodsDao;
+import com.zmx.mobilecashier.dao.groupDao;
 import com.zmx.mobilecashier.fragment.CommodityPositionFragment;
 import com.zmx.mobilecashier.http.OkHttp3ClientManager;
 import com.zmx.mobilecashier.ui.BaseActivity;
@@ -41,6 +54,7 @@ import com.zmx.mobilecashier.util.Tools;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.w3c.dom.Text;
 
 import java.io.Serializable;
 import java.text.ParseException;
@@ -59,8 +73,6 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
     private TextView text_total_price, text_discount_price, text_discount, text_paid_in, text_yingzhao;
 
     //显示商品和分类模块
-    private List<String> mPageTitleList = new ArrayList<String>();
-    private List<Fragment> mFragmentList = new ArrayList<Fragment>();
     private TabLayout tabLayout;
     private ViewPager mViewPager;
 
@@ -69,12 +81,8 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
     //左侧控件
     private TextView text_weight, text_order_number, text_variable, text_integral, text_account;
-    private String orderNumber = "";//订单编号
-    private String variable = "";//输入的变量
-    private Button button_delete_all,button_delete_selected, button_account, button_coupons,button_discount,button_intending,button_paid_in;
-    private static double discount = 1;// 折扣默认为不打折
-    private static  boolean memberCoupons = false;//优惠卷，默认不使用
-    private static CouponsMessage couponsMessage;//优惠卷类
+    private Button button_delete_all, button_delete_selected, button_are_cancelled, button_a_single,
+            button_account, button_coupons, button_discount, button_intending, button_paid_in;
 
     //显示放进购物车的模块u
     private ListView listView;
@@ -86,7 +94,17 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
     private String weight = "0.00";//全局重量
     private int vosPosition = -1;//选中购物车的商品，默认没选中
-    private float paid_in=0;//实收金额,默认为零，没有收
+    private float paid_in = 0;//实收金额,默认为零，没有收
+    private static double discount = 1;// 折扣默认为不打折
+    private static boolean memberCoupons = false;//优惠卷，默认不使用
+    private static CouponsMessage couponsMessage;//优惠卷类
+    private String orderNumber = "";//订单编号
+    private String variable = "";//输入的变量
+
+    private goodsDao gdao;
+    private groupDao cpdao;
+    private areCancelledDao acdao;
+    private areCancelledDetailsDao acddao;
 
 
     @Override
@@ -96,6 +114,11 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
     @Override
     protected void initViews() {
+
+        gdao = new goodsDao();
+        cpdao = new groupDao();
+        acdao = new areCancelledDao();
+        acddao = new areCancelledDetailsDao();
 
         //头部
         text_total_price = findViewById(R.id.text_total_price);
@@ -107,7 +130,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         //商品
         tabLayout = findViewById(R.id.tabLayout);
         mViewPager = findViewById(R.id.viewPager);
-        selectGoods();
+        selectGoodsData();
 
         //购物车
         listView = findViewById(R.id.listView);
@@ -142,6 +165,10 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         button_intending.setOnClickListener(this);
         button_paid_in = findViewById(R.id.button_paid_in);
         button_paid_in.setOnClickListener(this);
+        button_are_cancelled = findViewById(R.id.button_are_cancelled);
+        button_are_cancelled.setOnClickListener(this);
+        button_a_single = findViewById(R.id.button_a_single);
+        button_a_single.setOnClickListener(this);
 
         //左侧
         button1 = findViewById(R.id.button1);
@@ -201,18 +228,120 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
         switch (v.getId()) {
 
+            //挂单
+            case R.id.button_are_cancelled:
+
+                //判断有没有挂单数据
+                if (vos.size() > 0) {
+
+                    //查询挂单数量是否超出10个
+                    List<AreCancelled> ac_lists = acdao.queryAll();
+
+                    if(ac_lists.size() < 10){
+
+                        //再判断这单有没有挂单过了
+                        if (orderNumber.indexOf("A") == -1) {
+
+                            // 进来没挂过单的操作
+                            orderNumber = orderNumber + "A";
+                            text_order_number.setText(orderNumber);
+
+                            //拿到挂单数据
+                            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                            String g_time = sdf.format(new Date());// 挂单时间
+                            String g_members = text_account.getText().toString();// 是否有会员号
+
+                            for (int i = 0; i < vos.size(); i++) {
+
+                                AreCancelledDetails acd = new AreCancelledDetails();
+                                acd.setNumber(orderNumber);
+                                acd.setG_id(vos.get(i).getVo_g_id() + "");
+                                acd.setGd_name(vos.get(i).getVo_name());
+                                acd.setGd_price(vos.get(i).getVo_price());
+                                acd.setGd_mey(Float.parseFloat(vos.get(i).getVo_subtotal()));
+                                acd.setGd_weight(vos.get(i).getVo_weight());
+                                long l = acddao.insertCp(acd);//保存到数据库
+                            }
+
+                            AreCancelled ac = new AreCancelled();
+                            ac.setMembers(g_members);
+                            ac.setDate(g_time);
+                            ac.setNumber(orderNumber);
+                            ac.setDiscount(discount);
+                            ac.setTotal(Float.parseFloat(text_total_price.getText().toString()));
+                            long l = acdao.insertCp(ac);//保存到数据库
+
+                            if (l > 0) {
+
+                                Toast("挂单成功！");
+
+                            } else {
+
+                                Toast("挂单失败！");
+
+                            }
+
+                        } else {
+
+                            Toast("已经是挂单状态，无需挂单啦！");
+
+                        }
+
+
+                    }else{
+
+                        Toast("挂单失败,挂单数量超出上限了，请删除历史挂单！");
+
+                    }
+
+                } else {
+
+                    Toast("没有商品，无法挂单！");
+
+                }
+
+
+                break;
+
+            //取单
+            case R.id.button_a_single:
+
+                dialogGD();
+
+                break;
+
             //删除选中
             case R.id.button_delete_selected:
 
                 //判断是否有选中了商品
-                if(vosPosition == -1){
+                if (vosPosition == -1) {
+
                     Toast("请选择要删除的商品！");
-                }else{
+
+                } else {
+
+                    // 判断是否是挂单状态,是挂单就要删除挂单里面的商品
+                    if (orderNumber.indexOf("A") != -1) {
+
+                        ViceOrder vs = vos.get(vosPosition);
+                        AreCancelledDetails acd = new AreCancelledDetails();
+                        acd.setNumber(orderNumber);
+                        acd.setId(vs.getId());
+                        acd.setG_id(vs.getVo_g_id() + "");
+                        acd.setGd_name(vs.getVo_name());
+                        acd.setGd_price(vs.getVo_price());
+                        acd.setGd_mey(Float.parseFloat(vs.getVo_subtotal()));
+                        acd.setGd_weight(vs.getVo_weight());
+                        acddao.deleteAcd(acd);//删除商品记录
+
+                    }
 
                     //删除选中商品，刷新
                     vos.remove(vosPosition);
                     vos_adapter.setSelectPosition(-1);//设置没有选中了
                     vosPosition = -1;
+
+
                     //重新计算金额
                     countMoney();
 
@@ -223,27 +352,39 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
             //删除所有
             case R.id.button_delete_all:
 
-                //清空订单编号
-                orderNumber = "";
 
-                discount = 1;//初始化折扣
-                memberCoupons = false;//初始化优惠卷
+                //判断下，没有商品提示下
+                if (vos.size() > 0) {
 
-                //清空商品
-                vos.clear();
-                vos_adapter.notifyDataSetChanged();
-                //清空价格
-                text_total_price.setText("0.00");
-                text_discount_price.setText("0.00");
-                text_discount.setText("0.00");
-                text_paid_in.setText("0.00");
-                text_yingzhao.setText("0.00");
+                    //清空订单编号
+                    orderNumber = "";
+                    text_order_number.setText(orderNumber);
 
-                //清空会员信息
-                text_integral.setText("积分：");
-                text_account.setText("");
+                    discount = 1;//初始化折扣
+                    memberCoupons = false;//初始化优惠卷
+
+                    //清空商品
+                    vos.clear();
+                    vos_adapter.notifyDataSetChanged();
+                    //清空价格
+                    text_total_price.setText("0.00");
+                    text_discount_price.setText("0.00");
+                    text_discount.setText("0.00");
+                    text_paid_in.setText("0.00");
+                    text_yingzhao.setText("0.00");
+
+                    //清空会员信息
+                    text_integral.setText("积分：");
+                    text_account.setText("");
+
+                } else {
+
+                    Toast("没有商品！");
+
+                }
 
                 break;
+
 
             //退出系统
             case R.id.bottom_button1:
@@ -259,7 +400,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                 break;
             //云同步
             case R.id.bottom_button4:
-
+                selectGoods();
                 break;
             //后台
             case R.id.bottom_button5:
@@ -328,21 +469,21 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                 break;
 
-                //折扣按钮
+            //折扣按钮
             case R.id.button_discount:
 
                 //先判断有没有商品先
-                if(vos.size()>0){
+                if (vos.size() > 0) {
 
                     //判断用户输入
-                    if(TextUtils.isEmpty(text_variable.getText().toString())){
+                    if (TextUtils.isEmpty(text_variable.getText().toString())) {
 
                         Toast("请输入折扣，例如95折就输入0.95");
 
-                    }else{
+                    } else {
 
                         //判断用户输入的内容
-                        if(Float.parseFloat(text_variable.getText().toString())<=1){
+                        if (Float.parseFloat(text_variable.getText().toString()) <= 1) {
 
                             memberCoupons = false;//初始化优惠卷状态
                             discount = Float.parseFloat(text_variable.getText().toString());
@@ -350,7 +491,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                             variable = "";
                             countMoney();
 
-                        }else{
+                        } else {
 
                             Toast("这么大的折扣，都可以打骨折了，请重新输入！");
 
@@ -359,7 +500,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                     }
 
 
-                }else{
+                } else {
 
                     Toast("没有商品，无需打折！");
 
@@ -367,27 +508,27 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                 break;
 
-                //变价
+            //变价
             case R.id.button_intending:
 
                 //判断是否有输入
-                if (variable.equals("")){
+                if (variable.equals("")) {
 
                     Toast("请输入价格！");
 
-                }else{
+                } else {
 
                     //判断有没有选中商品先
-                    if (vosPosition == -1){
+                    if (vosPosition == -1) {
 
                         Toast("请选中要变价的商品！");
 
-                    }else{
+                    } else {
 
                         ViceOrder vo = vos.get(vosPosition);
                         vo.setVo_price(new Tools().priceResult(Float.parseFloat(variable)));
                         vo.setVo_subtotal(new Tools().priceResult(Float.parseFloat(vo.getVo_weight()) * Float.parseFloat(variable)));
-                        vos.set(vosPosition,vo);
+                        vos.set(vosPosition, vo);
                         vos_adapter.notifyDataSetChanged();
 
                         //初始化输入变量
@@ -403,37 +544,37 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                 break;
 
-                //实收
+            //实收
             case R.id.button_paid_in:
 
                 //判断是否有输入
-                if (variable.equals("")){
+                if (variable.equals("")) {
 
                     Toast("请输入实收金额！");
 
-                }else{
+                } else {
 
                     //2种状态下判断实收金额有没有小于总金额，没有使用折扣和优惠卷下，使用优惠卷和折扣下
                     float total = 0;
 
-                    if(discount == 1 && !memberCoupons){
+                    if (discount == 1 && !memberCoupons) {
 
                         total = Float.parseFloat(text_total_price.getText().toString());//获取总价
 
-                    }else{
+                    } else {
                         total = Float.parseFloat(text_discount_price.getText().toString());//折后价
                     }
 
                     paid_in = Float.parseFloat(variable);
 
-                    if(paid_in >= total){
+                    if (paid_in >= total) {
 
                         //初始化变量
                         variable = "";
                         text_variable.setText("");
                         countMoney();
 
-                    }else{
+                    } else {
 
                         Toast("实收不能小于总价格！");
 
@@ -548,48 +689,26 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                             JSONObject array = jsonObject.getJSONObject("list");
                             JSONArray goodsArray = array.getJSONArray("data");
 
-                            List<Group> groups = new ArrayList<>();
                             Gson g = new Gson();
                             for (int i = 0; i < groupArray.length(); i++) {
 
-                                List<Goods> goods = new ArrayList<>();
                                 JSONObject json = groupArray.getJSONObject(i);
                                 Group group = g.fromJson(json.toString(), Group.class);
-                                groups.add(group);
 
+                                cpdao.insertCp(group); //保存到本地
 
                                 for (int j = 0; j < goodsArray.length(); j++) {
 
                                     JSONObject goodsJson = goodsArray.getJSONObject(j);
                                     Goods good = g.fromJson(goodsJson.toString(), Goods.class);
 
-                                    if (good.getGroup() == group.getId()) {
+                                    gdao.insertCp(good);//保存到本地
 
-                                        goods.add(good);
-
-                                    }
                                 }
 
-                                mPageTitleList.add(group.getGname());
-
-                                CommodityPositionFragment fragment = new CommodityPositionFragment();
-                                fragment.setGoodsShoppingListener(MainActivity.this);
-                                Bundle bundle = new Bundle();
-                                bundle.putSerializable("goods", (Serializable) goods);
-                                fragment.setArguments(bundle);
-                                Log.e("的大小", "" + goods.size());
-                                mFragmentList.add(fragment);
                             }
 
-
-
-  /*viewPager通过适配器与fragment关联*/
-                            CPFragmentAdapter adapter = new CPFragmentAdapter(
-                                    getSupportFragmentManager(), mFragmentList, mPageTitleList);
-                            //TabLayout和ViewPager的关联
-                            mViewPager.setAdapter(adapter);
-                            tabLayout.setupWithViewPager(mViewPager);
-
+                            selectGoodsData();
                         }
 
 
@@ -636,6 +755,13 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                                 cm.setC_type(j.getInt("type") + "");
                                 cmss.add(cm);
                                 mm.setLists(cmss);
+
+                            }
+
+                            // 判断是否是挂单状态,是挂单就修改保存的会员号
+                            if (orderNumber.indexOf("A") != -1) {
+
+                                acdao.UpdateAc(orderNumber,bodys.getString("account"),bodys.getDouble("discounts"));
 
                             }
 
@@ -706,7 +832,6 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
     @Override
     public void setGoodsShopping(Goods g) {
 
-
         if (!weight.equals("0.00") || !variable.equals("")) {
 
 
@@ -751,8 +876,23 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
             vos_adapter.notifyDataSetChanged();
             listView.setSelection(vos.size() - 1);//控制消息保持在底部
 
+            // 判断是否是挂单状态,是挂单就保存好
+            if (orderNumber.indexOf("A") != -1) {
 
-        } else {
+                AreCancelledDetails acd = new AreCancelledDetails();
+                acd.setNumber(orderNumber);
+                acd.setG_id(v.getVo_g_id() + "");
+                acd.setGd_name(v.getVo_name());
+                acd.setGd_price(v.getVo_price());
+                acd.setGd_mey(Float.parseFloat(v.getVo_subtotal()));
+                acd.setGd_weight(v.getVo_weight());
+                long l = acddao.insertCp(acd);//保存到数据库
+
+            }
+
+
+
+            } else {
 
             if (Float.parseFloat(weight) < 0) {
 
@@ -797,9 +937,9 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         }
 
         //使用优惠卷
-        if(memberCoupons){
+        if (memberCoupons) {
 
-            if(couponsMessage != null){
+            if (couponsMessage != null) {
 
                 discount_price = totla_price - Float.parseFloat(couponsMessage.getC_quota());
                 text_discount_price.setText(Tools.priceResult(discount_price) + "");
@@ -809,14 +949,14 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         }
 
         //判断实收金额有没有输入
-        if(paid_in != 0){
+        if (paid_in != 0) {
 
             //减总价
-            if(discount == 1 && !memberCoupons){
+            if (discount == 1 && !memberCoupons) {
 
                 yinzhao = paid_in - totla_price;
 
-            }else{
+            } else {
 
                 //减折后价
                 yinzhao = paid_in - discount_price;
@@ -826,25 +966,23 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
         text_discount_price.setText(Tools.priceResult(discount_price) + "");//设置折后价
         text_discount.setText(Tools.priceResult(discount_yh) + "");//优惠的金额
-        text_paid_in.setText(paid_in+"");//实收
+        text_paid_in.setText(paid_in + "");//实收
         text_yingzhao.setText(Tools.priceResult(yinzhao) + "");//应找
 
     }
 
     //优惠卷界面
     private MemberCouponsAdapter mcAdapter;
-    private RelativeLayout layout1,layout2,layout3;
-    private TextView textView1,textView2,textView3;
-    private View view1,view2,view3;
+    private RelativeLayout layout1, layout2, layout3;
+    private TextView textView1, textView2, textView3;
+    private View view1, view2, view3;
 
     public void dialogCoupons(final List<CouponsMessage> cms) {
 
         final List<CouponsMessage> show = new ArrayList<>();
-        for (CouponsMessage c:filterCoupons(cms, 0)){
+        for (CouponsMessage c : filterCoupons(cms, 0)) {
             show.add(c);
         }
-
-        Log.e("过滤后的show", "：" + show.size());
 
         LayoutInflater inflater = LayoutInflater.from(this);//获取一个填充器
         View view = inflater.inflate(R.layout.dialog_coupons, null);//填充我们自定义的布局
@@ -887,13 +1025,13 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
 
-
                 //先判断是否满足使用条件了先
-                if (Float.parseFloat(text_total_price.getText().toString()) < Float.parseFloat(show.get(i).getC_term())){
+                if (Float.parseFloat(text_total_price.getText().toString()) < Float.parseFloat(show.get(i).getC_term())) {
 
                     Toast("无法使用优惠卷，未满足使用条件");
 
-                }else{
+                } else {
+
                     //先将折扣设置为1
                     discount = 1;
                     memberCoupons = true;
@@ -913,7 +1051,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                 initChoose(1);
                 show.clear();
-                for (CouponsMessage c:filterCoupons(cms, 0)){
+                for (CouponsMessage c : filterCoupons(cms, 0)) {
                     show.add(c);
                 }
                 if (show.size() > 0) {
@@ -938,7 +1076,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                 initChoose(2);
                 show.clear();
-                for (CouponsMessage c:filterCoupons(cms, 1 )){
+                for (CouponsMessage c : filterCoupons(cms, 1)) {
                     show.add(c);
                 }
 
@@ -957,7 +1095,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
             public void onClick(View view) {
                 initChoose(3);
                 show.clear();
-                for (CouponsMessage c:filterCoupons(cms, 2)){
+                for (CouponsMessage c : filterCoupons(cms, 2)) {
                     show.add(c);
                 }
                 if (show.size() > 0) {
@@ -974,11 +1112,12 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
     /**
      * 切换优惠卷
+     *
      * @param state
      */
-    public void initChoose(int state){
+    public void initChoose(int state) {
 
-        switch (state){
+        switch (state) {
 
             case 1:
 
@@ -1015,8 +1154,9 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
     /**
      * 过滤优惠卷
+     *
      * @param show  优惠卷集合
-     * @param state  要留的优惠卷
+     * @param state 要留的优惠卷
      * @return
      */
     public List<CouponsMessage> filterCoupons(List<CouponsMessage> show, int state) {
@@ -1066,7 +1206,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                         Date today = calendar.getTime();
 
-                        cm.setValidity("(有效期"+cm.getC_starttime()+"~"+sdf.format(today)+")");
+                        cm.setValidity("(有效期" + cm.getC_starttime() + "~" + sdf.format(today) + ")");
 
                     } else {
 
@@ -1142,6 +1282,191 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         return flag;
     }
 
+    //查询本地全部商品数据
+    public void selectGoodsData() {
+
+
+        List<String> mPageTitleList = new ArrayList<String>();
+        List<Fragment> mFragmentList = new ArrayList<>();
+        //先查询全部分类出来
+        List<Group> groups = cpdao.queryAll();
+
+        if (groups.size() > 0) {
+
+            for (int i = 0; i < groups.size(); i++) {
+
+                List<Goods> goods = gdao.queryWhere(groups.get(i).getId() + "");
+                mPageTitleList.add(groups.get(i).getGname());
+                CommodityPositionFragment fragment = new CommodityPositionFragment();
+                fragment.setGoodsShoppingListener(MainActivity.this);
+                Bundle bundle = new Bundle();
+                bundle.putSerializable("goods", (Serializable) goods);
+                fragment.setArguments(bundle);
+                mFragmentList.add(fragment);
+
+            }
+
+  /*viewPager通过适配器与fragment关联*/
+            CPFragmentAdapter adapter = new CPFragmentAdapter(
+                    getSupportFragmentManager(), mFragmentList, mPageTitleList);
+            //TabLayout和ViewPager的关联
+            mViewPager.setAdapter(adapter);
+            tabLayout.setupWithViewPager(mViewPager);
+
+        } else {
+
+            Toast("没有商品数据！");
+
+        }
+    }
+
+    private int ac_position = -1;//记录选择的挂单
+
+    //取单列表
+    public void dialogGD() {
+
+
+        final AreCancelledAdapter ac_adapter;
+        final List<AreCancelled> ac_lists = acdao.queryAll();
+        ac_adapter = new AreCancelledAdapter(this, ac_lists);
+
+        //详情
+        ListView acd_listView, ac_listView;
+        final List<ViceOrder> acd_vos = new ArrayList<>();
+
+        //赋值第一个挂单的数据
+        if (ac_lists.size() > 0) {
+
+            //生成订单详情
+            List<AreCancelledDetails> acd_lists = acddao.queryWhere(ac_lists.get(0).getNumber());
+
+            for (AreCancelledDetails a : acd_lists) {
+
+                ViceOrder v = new ViceOrder();
+                v.setVo_g_id(Integer.parseInt(a.getG_id()));
+                v.setVo_subtotal(a.getGd_mey() + "");
+                v.setVo_price(a.getGd_price());
+                v.setVo_weight(a.getGd_weight());
+                v.setVo_name(a.getGd_name());
+                acd_vos.add(v);
+
+            }
+        }
+        final GoodsShoppingAdapter acd_adapter = new GoodsShoppingAdapter(acd_vos, this);
+
+        LayoutInflater inflater = LayoutInflater.from(this);//获取一个填充器
+        View view = inflater.inflate(R.layout.dialog_are_cancelled, null);//填充我们自定义的布局
+
+        Display display = getWindowManager().getDefaultDisplay();//得到当前屏幕的显示器对象
+        Point size = new Point();//创建一个Point点对象用来接收屏幕尺寸信息
+        display.getSize(size);//Point点对象接收当前设备屏幕尺寸信息
+        int width = size.x;//从Point点对象中获取屏幕的宽度(单位像素)
+        int height = size.y;//从Point点对象中获取屏幕的高度(单位像素)
+        Log.v("zxy", "width=" + width + ",height=" + height);//width=480,height=854可知手机的像素是480x854的
+        //创建一个PopupWindow对象，第二个参数是设置宽度的，用刚刚获取到的屏幕宽度乘以2/3，取该屏幕的2/3宽度，从而在任何设备中都可以适配，高度则包裹内容即可，最后一个参数是设置得到焦点
+        final PopupWindow popWindow = new PopupWindow(view, 2 * width / 3, ViewGroup.LayoutParams.MATCH_PARENT, true);
+        popWindow.setBackgroundDrawable(new BitmapDrawable());//设置PopupWindow的背景为一个空的Drawable对象，如果不设置这个，那么PopupWindow弹出后就无法退出了
+        popWindow.setOutsideTouchable(true);//设置是否点击PopupWindow外退出PopupWindow
+        WindowManager.LayoutParams params = getWindow().getAttributes();//创建当前界面的一个参数对象
+        params.alpha = 0.8f;//设置参数的透明度为0.8，透明度取值为0~1，1为完全不透明，0为完全透明，因为android中默认的屏幕颜色都是纯黑色的，所以如果设置为1，那么背景将都是黑色，设置为0，背景显示我们的当前界面
+        getWindow().setAttributes(params);//把该参数对象设置进当前界面中
+        popWindow.setOnDismissListener(new PopupWindow.OnDismissListener() {//设置PopupWindow退出监听器
+            @Override
+            public void onDismiss() {//如果PopupWindow消失了，即退出了，那么触发该事件，然后把当前界面的透明度设置为不透明
+                WindowManager.LayoutParams params = getWindow().getAttributes();
+                params.alpha = 1.0f;//设置为不透明，即恢复原来的界面
+                getWindow().setAttributes(params);
+            }
+        });
+        //第一个参数为父View对象，即PopupWindow所在的父控件对象，第二个参数为它的重心，后面两个分别为x轴和y轴的偏移量
+        popWindow.showAtLocation(inflater.inflate(R.layout.activity_main, null), Gravity.CENTER, 0, 0);
+
+        ac_listView = view.findViewById(R.id.ac_listView);
+        ac_listView.setAdapter(ac_adapter);
+        ac_listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
+
+                ac_position = position;
+                ac_adapter.setSelectPosition(position);
+                acd_vos.clear();
+                //生成订单详情
+                List<AreCancelledDetails> acd_lists = acddao.queryWhere(ac_lists.get(position).getNumber());
+
+                for (AreCancelledDetails a : acd_lists) {
+
+                    ViceOrder v = new ViceOrder();
+                    v.setVo_g_id(Integer.parseInt(a.getG_id()));
+                    v.setVo_subtotal(a.getGd_mey() + "");
+                    v.setVo_price(a.getGd_price());
+                    v.setVo_weight(a.getGd_weight());
+                    v.setVo_name(a.getGd_name());
+                    v.setId(a.getId());
+                    acd_vos.add(v);
+
+                }
+
+                acd_adapter.notifyDataSetChanged();
+
+            }
+        });
+
+        acd_listView = view.findViewById(R.id.acd_listView);
+        acd_listView.setAdapter(acd_adapter);
+
+        Button button_are_qu = view.findViewById(R.id.button_are_qu);
+        button_are_qu.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+                vos.clear();//先清空购物车
+
+                //拿出购物车的东西
+                List<AreCancelledDetails> acd_lists = acddao.queryWhere(ac_lists.get(ac_position).getNumber());
+
+                //显示单号出来先
+                orderNumber = ac_lists.get(ac_position).getNumber();
+                text_order_number.setText(orderNumber);
+                discount = ac_lists.get(ac_position).getDiscount();//该订单的折扣
+
+                //判断有没有会员，有会员就显示出来
+                String s_member = ac_lists.get(ac_position).getMembers();
+                if(!TextUtils.isEmpty(s_member)){
+
+                    text_account.setText(s_member);
+
+                }
+
+                for (AreCancelledDetails ac:acd_lists){
+
+                    ViceOrder v = new ViceOrder();
+                    v.setVo_name(ac.getGd_name());
+                    v.setVo_weight(ac.getGd_weight());
+                    v.setVo_price(ac.getGd_price());
+                    v.setVo_subtotal(ac.getGd_mey()+"");
+                    v.setVo_g_id(Integer.parseInt(ac.getG_id()));
+                    v.setId(ac.getId());
+                    vos.add(v);
+                }
+
+                countMoney();
+                vos_adapter.notifyDataSetChanged();
+
+
+                popWindow.dismiss();
+
+            }
+        });
+
+        Button button_are_delete = view.findViewById(R.id.button_are_delete);
+        button_are_delete.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+            }
+        });
+
+    }
 
     //获取商品信息
     public void selectGoods() {

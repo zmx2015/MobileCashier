@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'org.greenrobot.greendao' // 添加应用依赖插件
 
 android {
     compileSdkVersion 26
@@ -9,6 +10,13 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            //设置支持的SO库架构
+            abiFilters 'armeabi', 'armeabi-v7a', 'arm64-v8a'
+            //, 'x86', 'armeabi-v7a', 'x86_64', 'arm64-v8a'
+        }
+
     }
     buildTypes {
         release {
@@ -16,6 +24,16 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+}
+
+
+greendao {
+    //数据库的schema版本，也可以理解为数据库版本号
+    schemaVersion 1
+    //设置DaoMaster、DaoSession、Dao包名，也就是要放置这些类的包的全路径。
+    daoPackage 'com.zmx.mobilecashier.greendaos'
+    //设置DaoMaster、DaoSession、Dao目录
+    targetGenDir 'src/main/java'
 }
 
 dependencies {
@@ -37,4 +55,8 @@ dependencies {
     compile 'com.github.bumptech.glide:glide:3.7.0'//图片加载
     compile 'com.android.support:cardview-v7:26.1.0'
     implementation files('libs/sun.misc.BASE64Decoder.jar')
+
+
+    compile 'org.greenrobot:greendao:3.2.2' // 添加库
+
 }

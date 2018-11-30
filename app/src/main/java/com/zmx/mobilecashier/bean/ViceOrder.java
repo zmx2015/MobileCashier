@@ -18,6 +18,7 @@ public class ViceOrder implements Serializable {
     private String vo_price;
     private String vo_subtotal;
     private String vo_time;
+    private Long id;//挂单后用到的id
 
 
     public int getVo_id() {
@@ -70,4 +71,11 @@ public class ViceOrder implements Serializable {
         this.vo_time = vo_time;
     }
 
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
 }
