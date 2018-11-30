@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/white">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:orientation="horizontal"
+        >
+
+        <RelativeLayout
+            android:id="@+id/layout1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            >
+            <TextView
+                android:id="@+id/textView1"
+                android:layout_width="match_parent"
+                android:layout_height="39dp"
+                android:textColor="@color/tou"
+                android:gravity="center"
+                android:text="可使用优惠卷"
+                />
+
+            <View
+                android:id="@+id/view1"
+                android:layout_below="@+id/textView1"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/tou"
+                ></View>
+
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/layout2"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            >
+            <TextView
+                android:id="@+id/textView2"
+                android:layout_width="match_parent"
+                android:layout_height="39dp"
+                android:gravity="center"
+                android:textColor="@color/tv_gray_deep"
+                android:text="已使用优惠卷"
+                />
+            <View
+                android:id="@+id/view2"
+                android:layout_below="@+id/textView2"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                ></View>
+
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/layout3"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            >
+            <TextView
+                android:id="@+id/textView3"
+                android:layout_width="match_parent"
+                android:layout_height="39dp"
+                android:textColor="@color/tv_gray_deep"
+                android:gravity="center"
+                android:text="已过期优惠卷"
+                />
+            <View
+                android:id="@+id/view3"
+                android:layout_below="@+id/textView3"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                ></View>
+
+        </RelativeLayout>
+
+
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/listView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:dividerHeight="2dp"
+        android:layout_marginTop="41dp"
+        android:fadingEdge="none"
+        android:choiceMode="singleChoice"
+        android:divider="#00000000"
+        ></ListView>
+
+
+        <ImageView
+            android:id="@+id/ic_no_card"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@mipmap/ic_no_card"
+            android:visibility="gone"
+            android:layout_centerInParent="true"
+            />
+
+    </RelativeLayout>
+</LinearLayout>
