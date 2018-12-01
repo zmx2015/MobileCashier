@@ -40,8 +40,10 @@ import com.zmx.mobilecashier.bean.AreCancelledDetails;
 import com.zmx.mobilecashier.bean.CouponsMessage;
 import com.zmx.mobilecashier.bean.Goods;
 import com.zmx.mobilecashier.bean.Group;
+import com.zmx.mobilecashier.bean.MainOrder;
 import com.zmx.mobilecashier.bean.MembersMessage;
 import com.zmx.mobilecashier.bean.ViceOrder;
+import com.zmx.mobilecashier.bean.ViceOrder_A;
 import com.zmx.mobilecashier.dao.areCancelledDao;
 import com.zmx.mobilecashier.dao.areCancelledDetailsDao;
 import com.zmx.mobilecashier.dao.goodsDao;
@@ -81,7 +83,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
     //左侧控件
     private TextView text_weight, text_order_number, text_variable, text_integral, text_account;
-    private Button button_delete_all, button_delete_selected, button_are_cancelled, button_a_single,
+    private Button button_delete_all, button_delete_selected, button_are_cancelled, button_a_single,button_cancellations,
             button_account, button_coupons, button_discount, button_intending, button_paid_in;
 
     //显示放进购物车的模块u
@@ -114,6 +116,8 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
     @Override
     protected void initViews() {
+
+        setTitleColor(R.id.position_view);
 
         gdao = new goodsDao();
         cpdao = new groupDao();
@@ -169,6 +173,8 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         button_are_cancelled.setOnClickListener(this);
         button_a_single = findViewById(R.id.button_a_single);
         button_a_single.setOnClickListener(this);
+        button_cancellations = findViewById(R.id.button_cancellations);
+        button_cancellations.setOnClickListener(this);
 
         //左侧
         button1 = findViewById(R.id.button1);
@@ -247,7 +253,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                             text_order_number.setText(orderNumber);
 
                             //拿到挂单数据
-                            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
                             String g_time = sdf.format(new Date());// 挂单时间
                             String g_members = text_account.getText().toString();// 是否有会员号
 
@@ -310,6 +316,46 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                 break;
 
+                //撤单
+            case R.id.button_cancellations:
+
+                String str = orderNumber;
+                boolean g_status = str.contains("A");
+
+                // 判断是否是挂单号，是就删除该挂单
+                if (g_status) {
+
+                    //删除该订单编号的所有详情
+                    acddao.deleteAcd(orderNumber);
+                    //再删除主单
+                    acdao.deleteAc(orderNumber);
+
+                }
+
+                //清空订单编号
+                orderNumber = "";
+                text_order_number.setText(orderNumber);
+
+                discount = 1;//初始化折扣
+                memberCoupons = false;//初始化优惠卷
+
+                //清空商品
+                vos.clear();
+                vos_adapter.notifyDataSetChanged();
+                //清空价格
+                text_total_price.setText("0.00");
+                text_discount_price.setText("0.00");
+                text_discount.setText("0.00");
+                text_paid_in.setText("0.00");
+                text_yingzhao.setText("0.00");
+
+                //清空会员信息
+                text_integral.setText("积分：");
+                text_account.setText("");
+
+
+                break;
+
             //删除选中
             case R.id.button_delete_selected:
 
@@ -323,16 +369,24 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                     // 判断是否是挂单状态,是挂单就要删除挂单里面的商品
                     if (orderNumber.indexOf("A") != -1) {
 
+
                         ViceOrder vs = vos.get(vosPosition);
                         AreCancelledDetails acd = new AreCancelledDetails();
                         acd.setNumber(orderNumber);
-                        acd.setId(vs.getId());
+                        acd.setId(vs.getAreC_id());
                         acd.setG_id(vs.getVo_g_id() + "");
                         acd.setGd_name(vs.getVo_name());
                         acd.setGd_price(vs.getVo_price());
                         acd.setGd_mey(Float.parseFloat(vs.getVo_subtotal()));
                         acd.setGd_weight(vs.getVo_weight());
-                        acddao.deleteAcd(acd);//删除商品记录
+
+                        //再判断这个商品是挂单前加入的还是挂单后加入的，通过保存本地的id来判断
+                        if(vs.getAreC_id() != null ){
+
+                            acddao.deleteAcd(acd);//删除商品记录
+
+                        }
+
 
                     }
 
@@ -425,13 +479,61 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
             //会员支付
             case R.id.bottom_button8:
 
+                //先判断有没有商品
+                if(vos.size() > 0){
+
+                    //判断有没有会员先
+                    if(TextUtils.isEmpty(text_account.getText().toString())){
+
+                        Toast("没有输入会员，无法使用会员支付！");
+
+                    }else {
+                        //提交订单
+                        submitOrder("3","4");
+                    }
+
+
+
+                }else{
+
+                    Toast("没有商品，无法提交订单");
+
+                }
+
                 break;
             //移动支付
             case R.id.bottom_button9:
 
+                //先判断有没有商品
+                if(vos.size() > 0){
+
+                    //提交订单
+                    submitOrder("4","2");
+
+
+                }else{
+
+                    Toast("没有商品，无法提交订单");
+
+                }
+
+
                 break;
             //现金
             case R.id.bottom_button10:
+
+                //先判断有没有商品
+                if(vos.size() > 0){
+
+                    //提交订单
+                    submitOrder("4","1");
+
+
+                }else{
+
+                    Toast("没有商品，无法提交订单");
+
+                }
 
                 break;
 
@@ -677,6 +779,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                 case 0:
 
+                    dismissLoadingView();
                     try {
 
                         Log.e("返回参数", "" + msg.obj.toString());
@@ -723,6 +826,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                 case 1:
 
+                    dismissLoadingView();
                     try {
 
                         JSONObject bodys = new JSONObject(msg.obj.toString());
@@ -785,6 +889,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                 case 2:
 
+                    dismissLoadingView();
                     try {
 
                         Log.e("返回的数据", "数据" + msg.obj.toString());
@@ -823,7 +928,48 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                     break;
 
+                case 3:
+
+                    dismissLoadingView();
+                    JSONObject bodys = null;
+
+                    try {
+                        bodys = new JSONObject(msg.obj.toString());
+
+                        if (bodys != null) {
+
+                            if (bodys.getString("status").equals("1")) {
+
+                                Toast("提交成功！");
+                                // 设置返回数据
+
+
+                            } else {
+
+                                Toast("提交失败 ！");
+
+                            }
+
+                        }
+
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+
+
+
+                    break;
+
+                case 404:
+
+                    dismissLoadingView();
+
+                    Toast("连接服务器失败，请重新连接！");
+
+                    break;
             }
+
+
 
         }
     };
@@ -864,18 +1010,6 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
             }
 
             v.setVo_time(new Tools().DateConversions(new Date()));
-            vos.add(v);
-
-            //重置变量
-            variable = "";
-            text_variable.setText("");
-
-            //重新统计金额
-            countMoney();
-            //更新
-            vos_adapter.notifyDataSetChanged();
-            listView.setSelection(vos.size() - 1);//控制消息保持在底部
-
             // 判断是否是挂单状态,是挂单就保存好
             if (orderNumber.indexOf("A") != -1) {
 
@@ -887,9 +1021,20 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                 acd.setGd_mey(Float.parseFloat(v.getVo_subtotal()));
                 acd.setGd_weight(v.getVo_weight());
                 long l = acddao.insertCp(acd);//保存到数据库
-
+                v.setAreC_id(l);
             }
 
+            vos.add(v);
+
+            //重置变量
+            variable = "";
+            text_variable.setText("");
+
+            //重新统计金额
+            countMoney();
+            //更新
+            vos_adapter.notifyDataSetChanged();
+            listView.setSelection(vos.size() - 1);//控制消息保持在底部
 
 
             } else {
@@ -1351,6 +1496,9 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                 acd_vos.add(v);
 
             }
+
+            ac_adapter.setSelectPosition(0);//设置默认选中第一个
+            ac_position = 0;
         }
         final GoodsShoppingAdapter acd_adapter = new GoodsShoppingAdapter(acd_vos, this);
 
@@ -1401,7 +1549,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                     v.setVo_price(a.getGd_price());
                     v.setVo_weight(a.getGd_weight());
                     v.setVo_name(a.getGd_name());
-                    v.setId(a.getId());
+                    v.setAreC_id(a.getId());
                     acd_vos.add(v);
 
                 }
@@ -1418,6 +1566,10 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         button_are_qu.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+
+
+                //判断有没有选中了订单
+                if(ac_position != -1){
 
                 vos.clear();//先清空购物车
 
@@ -1445,15 +1597,19 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                     v.setVo_price(ac.getGd_price());
                     v.setVo_subtotal(ac.getGd_mey()+"");
                     v.setVo_g_id(Integer.parseInt(ac.getG_id()));
-                    v.setId(ac.getId());
+                    v.setAreC_id(ac.getId());
                     vos.add(v);
                 }
 
                 countMoney();
                 vos_adapter.notifyDataSetChanged();
-
-
                 popWindow.dismiss();
+
+                }else{
+
+                    Toast("请选择挂单！");
+
+                }
 
             }
         });
@@ -1463,6 +1619,33 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
             @Override
             public void onClick(View view) {
 
+                //判断有没有选中了订单
+                if(ac_position != -1){
+
+                    //获取要选中要删除的挂单的订单编号
+                    //删除该订单编号的所有详情
+                    acddao.deleteAcd(ac_lists.get(ac_position).getNumber());
+                    //再删除主单
+                    acdao.deleteAc(ac_lists.get(ac_position));
+
+                    //刷新数据
+                    ac_lists.remove(ac_position);
+                    acd_vos.clear();
+
+                    //删除选中商品，刷新
+                    ac_adapter.setSelectPosition(-1);//设置没有选中了
+                    ac_position = -1;
+                    acd_adapter.notifyDataSetChanged();
+
+                }else{
+
+                    Toast("请选择挂单！");
+
+                }
+
+
+
+
             }
         });
 
@@ -1471,6 +1654,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
     //获取商品信息
     public void selectGoods() {
 
+        showLoadingView("更新中...");
         Map<String, String> params = new HashMap<String, String>();
         params.put("pckey", Tools.getKey(MyApplication.getName()));
         params.put("account", "0");
@@ -1484,6 +1668,8 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
     //查询会员
     public void selectMember(String account) {
 
+
+        showLoadingView("查询中...");
         Map<String, String> params = new HashMap<String, String>();
         params.put("pckey", Tools.getKey(account));
         params.put("account", "0");
@@ -1498,6 +1684,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
     //获取会员优惠卷
     public void selectMemberCoupons(String account) {
 
+        showLoadingView("获取中...");
         Map<String, String> params = new HashMap<String, String>();
         params.put("pckey", Tools.getKey(account));
         params.put("account", "0");
@@ -1508,5 +1695,60 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         OkHttp3ClientManager.getInstance().NetworkRequestMode("http://www.yiyuangy.com/admin/api.lineapi/getCoupons", params, mHandler, 2, 404);
 
     }
+
+
+    //提交订单
+    public void submitOrder(String classify,String payment){
+
+        showLoadingView("加载中...");
+        List<ViceOrder_A> lists = new ArrayList<>();
+        for (ViceOrder v : vos){
+
+            ViceOrder_A va = new ViceOrder_A();
+
+            va.setGoods_id(v.getVo_g_id()+"");
+            va.setName(v.getVo_name());
+            va.setPrice(v.getVo_price());
+            va.setSubtotal(v.getVo_subtotal());
+            va.setWeight(v.getVo_weight());
+
+            lists.add(va);
+        }
+
+        Gson g = new Gson();
+        String jsonString = g.toJson(lists);
+
+        Map<String, String> mapData = new HashMap<String, String>();
+        mapData.put("admin", MyApplication.getName());
+        mapData.put("mid", MyApplication.getStore_id());
+        mapData.put("pckey", new Tools().getKey(this));
+
+        //判断是否是会员单
+        if(classify.equals("3")){
+            mapData.put("account", text_account.getText().toString());
+        }else{
+
+            mapData.put("account", "0");
+        }
+
+        mapData.put("orderAll", jsonString);
+        mapData.put("zmey", text_total_price.getText().toString());// 总价
+        mapData.put("yhui", text_discount_price.getText().toString());
+        mapData.put("shishou", text_paid_in.getText().toString());// 实收
+        mapData.put("yingzhao", text_yingzhao.getText().toString());// 应找
+        mapData.put("payment", payment);
+        mapData.put("ordernumber", orderNumber);
+        mapData.put("discount", text_discount.getText().toString());
+        String phpTime = new Date().getTime() + "";
+        mapData.put("synchro", phpTime.substring(0, phpTime.length() - 3));
+        mapData.put("buytime", phpTime.substring(0, phpTime.length() - 3));
+        mapData.put("classify", classify);
+
+        OkHttp3ClientManager.getInstance().NetworkRequestMode("http://www.yiyuangy.com/admin/api.order/orderAdd", mapData, mHandler, 3, 404);
+
+
+    }
+
+
 
 }

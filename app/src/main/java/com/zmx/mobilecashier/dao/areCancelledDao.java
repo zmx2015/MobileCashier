@@ -2,7 +2,9 @@ package com.zmx.mobilecashier.dao;
 
 import com.zmx.mobilecashier.MyApplication;
 import com.zmx.mobilecashier.bean.AreCancelled;
+import com.zmx.mobilecashier.bean.AreCancelledDetails;
 import com.zmx.mobilecashier.greendaos.AreCancelledDao;
+import com.zmx.mobilecashier.greendaos.AreCancelledDetailsDao;
 
 import java.util.List;
 
@@ -35,7 +37,7 @@ public class areCancelledDao {
     }
 
     /**
-     * 修改会员号和折扣
+     * 修改
      */
     public void UpdateAc(String number,String member,double d){
 
@@ -68,6 +70,22 @@ public class areCancelledDao {
             dao.deleteByKey(g.getId());
         }
 
+    }
+
+    /**
+     * 根据商品订单编号删除
+     * @param number
+     */
+    public void deleteAc(String number){
+
+        AreCancelled g = dao.queryBuilder().where(AreCancelledDao.Properties.Number.eq(number)).build().unique();
+
+        if(g != null){
+
+            //通过Key来删除，这里的Key就是user字段中的ID号
+            dao.deleteByKey(g.getId());
+
+        }
     }
 
     public void deleteData(){

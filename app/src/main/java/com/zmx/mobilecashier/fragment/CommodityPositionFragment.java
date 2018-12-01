@@ -17,7 +17,9 @@ import com.zmx.mobilecashier.bean.Goods;
 import java.util.List;
 
 /**
- * Created by Administrator on 2018-11-28.
+ * 开发人员：曾敏祥
+ * 开发时间：2018-12-01 10:12
+ * 类功能：显示商品列表
  */
 
 public class CommodityPositionFragment extends BaseFragment{
@@ -42,7 +44,8 @@ public class CommodityPositionFragment extends BaseFragment{
         WindowManager wm = this.getActivity().getWindowManager();
         int width = wm.getDefaultDisplay().getWidth();
         gridView.setColumnWidth(width/10);
-
+        gridView.setHorizontalSpacing(2);
+        gridView.setVerticalSpacing(2);
         gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
 
             @Override

@@ -10,6 +10,7 @@ import java.io.Serializable;
 
 public class ViceOrder implements Serializable {
 
+//    private Long id;
     private int vo_id;
     private String vo_ordernumber;
     private int vo_g_id;
@@ -18,7 +19,7 @@ public class ViceOrder implements Serializable {
     private String vo_price;
     private String vo_subtotal;
     private String vo_time;
-    private Long id;//挂单后用到的id
+    private Long areC_id;//挂单后用到的id
 
 
     public int getVo_id() {
@@ -71,11 +72,18 @@ public class ViceOrder implements Serializable {
         this.vo_time = vo_time;
     }
 
-    public Long getId() {
-        return id;
+    public Long getAreC_id() {
+        return areC_id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public void setAreC_id(Long areC_id) {
+        this.areC_id = areC_id;
     }
+//    public Long getId() {
+//        return id;
+//    }
+//
+//    public void setId(Long id) {
+//        this.id = id;
+//    }
 }

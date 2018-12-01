@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context="com.zmx.mobilecashier.MainActivity">
+    <!--沉浸式activity，这个view是用来占位的   -->
+    <View
+        android:id="@+id/position_view"
+        android:layout_width="30px"
+        android:layout_height="30px" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_below="@+id/position_view"
         android:orientation="vertical">
 
         <LinearLayout
@@ -156,6 +162,31 @@
 
             </RelativeLayout>
 
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="30dp"
+                android:layout_weight="1"
+                android:gravity="center">
+
+                <TextView
+                    android:id="@+id/text6"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="收银员："
+                    android:textColor="@color/grey_700"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_toRightOf="@+id/text6"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/red"
+                    android:text="zmx"
+                    android:textSize="14sp"
+                    />
+
+            </RelativeLayout>
+
         </LinearLayout>
 
 
@@ -228,6 +259,7 @@
                         android:text="取单" />
 
                     <Button
+                        android:id="@+id/button_cancellations"
                         android:layout_width="match_parent"
                         android:background="@drawable/buttonstyle"
                         android:textSize="12sp"
@@ -384,6 +416,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:dividerHeight="2dp"
+                        android:layout_marginTop="@dimen/dp_5"
                         android:fadingEdge="none"
                         android:choiceMode="singleChoice"
                         android:divider="#00000000"
@@ -461,6 +494,7 @@
 
                     <android.support.v4.view.ViewPager
                         android:id="@+id/viewPager"
+                        android:background="@color/white"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent" />
                 </LinearLayout>
@@ -721,4 +755,4 @@
     </LinearLayout>
 
 
-</android.support.constraint.ConstraintLayout>
+</RelativeLayout>
