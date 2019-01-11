@@ -55,6 +55,7 @@ public class CommodityPositionFragment extends BaseFragment{
                 Log.e("点击了",""+lists.get(position).getName());
                 gs.setGoodsShopping(lists.get(position));
 
+
             }
         });
 

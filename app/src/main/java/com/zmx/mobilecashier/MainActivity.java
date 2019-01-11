@@ -1,5 +1,6 @@
 package com.zmx.mobilecashier;
 
+import android.content.Intent;
 import android.graphics.Point;
 import android.graphics.drawable.BitmapDrawable;
 import android.os.Handler;
@@ -51,7 +52,9 @@ import com.zmx.mobilecashier.dao.groupDao;
 import com.zmx.mobilecashier.fragment.CommodityPositionFragment;
 import com.zmx.mobilecashier.http.OkHttp3ClientManager;
 import com.zmx.mobilecashier.ui.BaseActivity;
+import com.zmx.mobilecashier.util.CustomerEngine;
 import com.zmx.mobilecashier.util.Tools;
+import com.zmx.mobilecashier.util.UrlConfig;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -117,6 +120,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
     @Override
     protected void initViews() {
 
+        CustomerEngine.getInstance(getApplicationContext()).setProductList(null);
         setTitleColor(R.id.position_view);
 
         gdao = new goodsDao();
@@ -147,6 +151,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                 vosPosition = i;
                 vos_adapter.setSelectPosition(i);
+                CustomerEngine.getInstance(getApplicationContext()).Selected(i);
 
             }
         });
@@ -352,6 +357,8 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                 //清空会员信息
                 text_integral.setText("积分：");
                 text_account.setText("");
+//副屏撤单
+                CustomerEngine.getInstance(getApplicationContext()).Cancellations();
 
 
                 break;
@@ -368,7 +375,6 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                     // 判断是否是挂单状态,是挂单就要删除挂单里面的商品
                     if (orderNumber.indexOf("A") != -1) {
-
 
                         ViceOrder vs = vos.get(vosPosition);
                         AreCancelledDetails acd = new AreCancelledDetails();
@@ -390,6 +396,8 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                     }
 
+                    //删除副屏的
+                    CustomerEngine.getInstance(getApplicationContext()).deleteGoods(vos.get(vosPosition));
                     //删除选中商品，刷新
                     vos.remove(vosPosition);
                     vos_adapter.setSelectPosition(-1);//设置没有选中了
@@ -430,6 +438,9 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                     //清空会员信息
                     text_integral.setText("积分：");
                     text_account.setText("");
+
+                    //副屏撤单
+                    CustomerEngine.getInstance(getApplicationContext()).Cancellations();
 
                 } else {
 
@@ -548,8 +559,8 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                     //先要初始化优惠卷,预防上一个会员使用优惠卷了
                     memberCoupons = false;
-
                     selectMember(variable);
+
                 }
 
                 break;
@@ -793,6 +804,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                             JSONArray goodsArray = array.getJSONArray("data");
 
                             Gson g = new Gson();
+                            //循环类目
                             for (int i = 0; i < groupArray.length(); i++) {
 
                                 JSONObject json = groupArray.getJSONObject(i);
@@ -800,14 +812,15 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                                 cpdao.insertCp(group); //保存到本地
 
-                                for (int j = 0; j < goodsArray.length(); j++) {
 
-                                    JSONObject goodsJson = goodsArray.getJSONObject(j);
-                                    Goods good = g.fromJson(goodsJson.toString(), Goods.class);
+                            }
+                            //循环商品
+                            for (int j = 0; j < goodsArray.length(); j++) {
 
-                                    gdao.insertCp(good);//保存到本地
+                                JSONObject goodsJson = goodsArray.getJSONObject(j);
+                                Goods good = g.fromJson(goodsJson.toString(), Goods.class);
 
-                                }
+                                gdao.insertCp(good);//保存到本地
 
                             }
 
@@ -842,6 +855,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                             mm.setAccount(bodys.getString("account"));
                             mm.setDiscounts(bodys.getString("discounts"));
                             mm.setIntegral(bodys.getInt("integral"));
+                            mm.setMoney(bodys.getString("money"));
                             JSONArray array = bodys.getJSONArray("coupons");
                             List<CouponsMessage> cmss = new ArrayList<CouponsMessage>();
                             for (int z = 0; z < array.length(); z++) {
@@ -876,6 +890,9 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                             text_account.setText("" + bodys.getString("account"));
                             text_variable.setText("");
                             variable = "";
+
+                            CustomerEngine.getInstance(getApplicationContext()).ShowUser(mm);
+
                             countMoney();//重新统计金额
 
                         }
@@ -933,6 +950,8 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                     dismissLoadingView();
                     JSONObject bodys = null;
 
+                    Log.e("提交订单返回数据","数据："+msg.obj.toString());
+
                     try {
                         bodys = new JSONObject(msg.obj.toString());
 
@@ -942,7 +961,6 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
                                 Toast("提交成功！");
                                 // 设置返回数据
-
 
                             } else {
 
@@ -955,8 +973,6 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
-
-
 
                     break;
 
@@ -1024,6 +1040,8 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
                 v.setAreC_id(l);
             }
 
+            CustomerEngine.getInstance(getApplicationContext()).setProductList(v);
+
             vos.add(v);
 
             //重置变量
@@ -1058,26 +1076,26 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
     public void countMoney() {
 
         //第一步，先获取总金额
-        float totla_price = 0;//总价
+        float total_price = 0;//总价
         float discount_price = 0;//折后价
         float discount_yh = 0;//优惠金额
         float yinzhao = 0;
 
         for (int i = 0; i < vos.size(); i++) {
 
-            totla_price = Float.parseFloat(vos.get(i).getVo_subtotal()) + totla_price;
+            total_price = Float.parseFloat(vos.get(i).getVo_subtotal()) + total_price;
 
         }
         //显示出来
-        text_total_price.setText(Tools.priceResult(totla_price));
+        text_total_price.setText(Tools.priceResult(total_price));
 
         //统计使用折扣后的折后价和优惠金额
         if (discount < 1) {
 
-            text_discount_price.setText(Tools.priceResult(totla_price));
-            discount_price = (float) (Math.round((float) (totla_price * discount) * 100)) / 100;// 折后价
+            text_discount_price.setText(Tools.priceResult(total_price));
+            discount_price = (float) (Math.round((float) (total_price * discount) * 100)) / 100;// 折后价
             text_discount_price.setText(Tools.priceResult(discount_price) + "");
-            discount_yh = totla_price - discount_price;
+            discount_yh = total_price - discount_price;
 
         }
 
@@ -1086,7 +1104,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
 
             if (couponsMessage != null) {
 
-                discount_price = totla_price - Float.parseFloat(couponsMessage.getC_quota());
+                discount_price = total_price - Float.parseFloat(couponsMessage.getC_quota());
                 text_discount_price.setText(Tools.priceResult(discount_price) + "");
                 discount_yh = Float.parseFloat(couponsMessage.getC_quota());
             }
@@ -1099,7 +1117,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
             //减总价
             if (discount == 1 && !memberCoupons) {
 
-                yinzhao = paid_in - totla_price;
+                yinzhao = paid_in - total_price;
 
             } else {
 
@@ -1113,6 +1131,8 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         text_discount.setText(Tools.priceResult(discount_yh) + "");//优惠的金额
         text_paid_in.setText(paid_in + "");//实收
         text_yingzhao.setText(Tools.priceResult(yinzhao) + "");//应找
+
+        CustomerEngine.getInstance(getApplicationContext()).UpdateMoney("",total_price+"",Tools.priceResult(discount_yh) + "",paid_in + "");
 
     }
 
@@ -1470,7 +1490,6 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
     //取单列表
     public void dialogGD() {
 
-
         final AreCancelledAdapter ac_adapter;
         final List<AreCancelled> ac_lists = acdao.queryAll();
         ac_adapter = new AreCancelledAdapter(this, ac_lists);
@@ -1661,7 +1680,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         params.put("admin", MyApplication.getName());
         params.put("mid", MyApplication.getStore_id());
 
-        OkHttp3ClientManager.getInstance().NetworkRequestMode("http://www.yiyuangy.com/admin/api.goods/goodGroupsList", params, mHandler, 0, 404);
+        OkHttp3ClientManager.getInstance().NetworkRequestMode(UrlConfig.GOODS_LIST, params, mHandler, 0, 404);
 
     }
 
@@ -1677,7 +1696,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         params.put("mid", MyApplication.getStore_id());
         params.put("account", account);
 
-        OkHttp3ClientManager.getInstance().NetworkRequestMode("http://www.yiyuangy.com/admin/api.lineapi/getUserInfo", params, mHandler, 1, 404);
+        OkHttp3ClientManager.getInstance().NetworkRequestMode(UrlConfig.SELECT_MEMBER, params, mHandler, 1, 404);
 
     }
 
@@ -1692,7 +1711,7 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         params.put("mid", MyApplication.getStore_id());
         params.put("account", account);
 
-        OkHttp3ClientManager.getInstance().NetworkRequestMode("http://www.yiyuangy.com/admin/api.lineapi/getCoupons", params, mHandler, 2, 404);
+        OkHttp3ClientManager.getInstance().NetworkRequestMode(UrlConfig.COUPONS_LIST, params, mHandler, 2, 404);
 
     }
 
@@ -1724,11 +1743,12 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         mapData.put("pckey", new Tools().getKey(this));
 
         //判断是否是会员单
-        if(classify.equals("3")){
-            mapData.put("account", text_account.getText().toString());
-        }else{
+        if(TextUtils.isEmpty(text_account.getText().toString())){
 
             mapData.put("account", "0");
+
+        }else{
+            mapData.put("account", text_account.getText().toString());
         }
 
         mapData.put("orderAll", jsonString);
@@ -1744,11 +1764,21 @@ public class MainActivity extends BaseActivity implements CommodityPositionFragm
         mapData.put("buytime", phpTime.substring(0, phpTime.length() - 3));
         mapData.put("classify", classify);
 
-        OkHttp3ClientManager.getInstance().NetworkRequestMode("http://www.yiyuangy.com/admin/api.order/orderAdd", mapData, mHandler, 3, 404);
+        OkHttp3ClientManager.getInstance().NetworkRequestMode(UrlConfig.ADD_ORDER, mapData, mHandler, 3, 404);
 
 
     }
 
 
+    @Override
+    public void onBackPressed() {
+        onDestroy();
+        //完全退出应用，取消双屏异显
+        Intent startMain = new Intent(Intent.ACTION_MAIN);
+        startMain.addCategory(Intent.CATEGORY_HOME);
+        startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(startMain);
+        System.exit(0);
+    }
 
 }

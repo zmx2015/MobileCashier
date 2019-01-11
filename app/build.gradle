@@ -59,4 +59,6 @@ dependencies {
 
     compile 'org.greenrobot:greendao:3.2.2' // 添加库
 
+    implementation'com.youth.banner:banner:1.4.10' //图片轮播
+
 }

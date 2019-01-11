@@ -20,6 +20,7 @@ import com.zmx.mobilecashier.bean.StoresMessage;
 import com.zmx.mobilecashier.http.OkHttp3ClientManager;
 import com.zmx.mobilecashier.util.Base64Utils;
 import com.zmx.mobilecashier.util.MySharedPreferences;
+import com.zmx.mobilecashier.util.UrlConfig;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -211,7 +212,7 @@ public class LoginActivity extends BaseActivity implements View.OnClickListener,
         params.put("username", getAccount());
         params.put("password", md5(getPassword()));
 
-        OkHttp3ClientManager.getInstance().NetworkRequestMode("http://www.yiyuangy.com/admin/api.line/login", params, handler, 1, 404);
+        OkHttp3ClientManager.getInstance().NetworkRequestMode(UrlConfig.LOGIN, params, handler, 1, 404);
 
 
         //请求网络
